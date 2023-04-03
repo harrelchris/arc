@@ -1,1 +1,3 @@
-# arc
+# ARC
+
+ASGI web server framework
