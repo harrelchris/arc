@@ -1,58 +1,71 @@
-import json
+from .http.request import Request
+from .http.response import Response
+
+
+class UnsupportedRequestTypeError(Exception):
+    """Exception for unsupported request types."""
+
+    def __init__(self, scope_type):
+        self.scope_type = scope_type
+
+    def __str__(self):
+        return f"{self.scope_type} is an unsupported request type."
 
 
 class Arc:
-    def __init__(self):
-        pass
-
     async def __call__(self, scope, receive, send):
         if scope['type'] == 'lifespan':
-            while True:
-                message = await receive()
-                if message['type'] == 'lifespan.startup':
-                    response = await self.handle_startup()
-                    await send(response)
-                elif message['type'] == 'lifespan.shutdown':
-                    await self.handle_shutdown()
-                    await send({'type': 'lifespan.shutdown.complete'})
-                    return
+            await self.lifespan(scope, receive, send)
         elif scope['type'] == 'http':
-            await self.handle_http(scope, receive, send)
+            await self.http(scope, receive, send)
         else:
-            await self.handle_other(scope, receive, send)
+            raise UnsupportedRequestTypeError(scope.get('type'))
 
-    async def handle_startup(self):
+    async def lifespan(self, scope, receive, send):
+        while True:
+            message = await receive()
+            if message['type'] == 'lifespan.startup':
+                await self.startup(scope, receive, send)
+            elif message['type'] == 'lifespan.shutdown':
+                await self.shutdown(scope, receive, send)
+                return
+
+    async def startup(self, scope, receive, send):
         """Perform startup processes and return lifespan response"""
 
         try:
             pass  # some error prone operations
         except Exception as e:  # TODO: handle specific exceptions
-            return {'type': 'lifespan.startup.failed'}
+            response = {'type': 'lifespan.startup.failed', 'message': e}
         else:
-            return {'type': 'lifespan.startup.complete'}
+            response = {'type': 'lifespan.startup.complete'}
+        await send(response)
 
-    async def handle_shutdown(self):
+    async def shutdown(self, scope, receive, send):
         """Perform shutdown processes and return lifespan response"""
 
         try:
+            print("Shutting down")
             pass  # some error prone operations
         except Exception as e:  # TODO: handle specific exceptions
-            return {'type': 'lifespan.shutdown.failed'}
+            response = {'type': 'lifespan.startup.failed', 'message': e}
         else:
-            return {'type': 'lifespan.shutdown.complete'}
+            response = {'type': 'lifespan.shutdown.complete'}
+        await send(response)
 
-    async def handle_http(self, scope, receive, send):
-        event = await receive()
-        data = {
-            "key": "value"
-        }
-        string = json.dumps(data)
-        response = string.encode()
-
-        await send({"type": "http.response.start", "status": 200, "headers": {}, "trailers": False})
-        await send({"type": "http.response.body", "body": response, "more_body": False})
-
-    async def handle_other(self, scope, receive, send):
-        """Placeholder for websockets and unknown"""
-
-        print(f"Received Other: {scope['type']}")
+    async def http(self, scope, receive, send):
+        request = Request(scope)
+        request.body = await request.read_body(receive)
+        response = Response()
+        response.append_header("key", "value")
+        await send({
+            "type": "http.response.start",
+            "status": response.status,
+            "headers": response.headers,
+            "trailers": False
+        })
+        await send({
+            "type": "http.response.body",
+            "body": response.body,
+            "more_body": False
+        })
