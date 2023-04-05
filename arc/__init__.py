@@ -59,7 +59,8 @@ class Arc:
     async def http(self, scope, receive, send):
         request = Request(scope)
         request.body = await request.read_body(receive)
-        response = self.routes[request.path]["view"](request)
+        view = self.routes[request.path]["view"]
+        response = view(request)
         await send({
             "type": "http.response.start",
             "status": response.status,
