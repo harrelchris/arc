@@ -13,6 +13,9 @@ class UnsupportedRequestTypeError(Exception):
 
 
 class Arc:
+    def __init__(self):
+        self.routes = {}
+
     async def __call__(self, scope, receive, send):
         if scope['type'] == 'lifespan':
             await self.lifespan(scope, receive, send)
@@ -56,8 +59,7 @@ class Arc:
     async def http(self, scope, receive, send):
         request = Request(scope)
         request.body = await request.read_body(receive)
-        response = Response()
-        response.append_header("key", "value")
+        response = self.routes[request.path]["view"](request)
         await send({
             "type": "http.response.start",
             "status": response.status,
@@ -69,3 +71,9 @@ class Arc:
             "body": response.body,
             "more_body": False
         })
+
+    def add_route(self, path, view, methods=None):
+        self.routes[path] = {
+            "view": view,
+            "methods": methods or ["GET"],
+        }
