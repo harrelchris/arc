@@ -1,8 +1,15 @@
-class Response:
-    def __init__(self):
-        self.headers = []
-        self.body = b''
-        self.status = 200
+import json
 
-    def append_header(self, key: str, value: str):
-        self.headers.append((key.encode(), value.encode()))
+
+class Response:
+    def __init__(self, body: dict, headers: dict = None, status: int = 200):
+        self.headers = self.format_headers_dict(headers)
+        self.body = json.dumps(body).encode()
+        self.status = status
+
+    def format_headers_dict(self, headers: dict) -> list:
+        formatted = []
+        if headers:
+            for key, value in headers.items():
+                formatted.append((key.encode(), value.encode()))
+        return formatted
